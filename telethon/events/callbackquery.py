@@ -129,6 +129,14 @@ class CallbackQuery(EventBuilder):
                 self.sender_id, self._entities, client._entity_cache)
 
         @property
+        def raw_query(self):
+            """
+            Returns the user ID who click the inline
+            button.
+            """
+            return self.query.user_id
+        
+        @property
         def id(self):
             """
             Returns the query ID. The user clicking the inline
