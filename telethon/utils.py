@@ -12,6 +12,7 @@ import logging
 import math
 import mimetypes
 import os
+import pathlib
 import re
 import struct
 from collections import namedtuple
@@ -211,6 +212,12 @@ def get_input_peer(entity, allow_self=True, check_hash=True):
     if isinstance(entity, types.InputUserSelf):
         return types.InputPeerSelf()
 
+    if isinstance(entity, types.InputUserFromMessage):
+        return types.InputPeerUserFromMessage(entity.peer, entity.msg_id, entity.user_id)
+
+    if isinstance(entity, types.InputChannelFromMessage):
+        return types.InputPeerChannelFromMessage(entity.peer, entity.msg_id, entity.channel_id)
+
     if isinstance(entity, types.UserEmpty):
         return types.InputPeerEmpty()
 
@@ -248,6 +255,9 @@ def get_input_channel(entity):
     if isinstance(entity, types.InputPeerChannel):
         return types.InputChannel(entity.channel_id, entity.access_hash)
 
+    if isinstance(entity, types.InputPeerChannelFromMessage):
+        return types.InputChannelFromMessage(entity.peer, entity.msg_id, entity.channel_id)
+
     _raise_cast_fail(entity, 'InputChannel')
 
 
@@ -284,6 +294,9 @@ def get_input_user(entity):
 
     if isinstance(entity, types.InputPeerUser):
         return types.InputUser(entity.user_id, entity.access_hash)
+
+    if isinstance(entity, types.InputPeerUserFromMessage):
+        return types.InputUserFromMessage(entity.peer, entity.msg_id, entity.user_id)
 
     _raise_cast_fail(entity, 'InputUser')
 
@@ -471,7 +484,10 @@ def get_input_media(
                 file=media, mime_type=mime, attributes=attrs)
 
     if isinstance(media, types.MessageMediaGame):
-        return types.InputMediaGame(id=media.game.id)
+        return types.InputMediaGame(id=types.InputGameID(
+            id=media.game.id,
+            access_hash=media.game.access_hash
+        ))
 
     if isinstance(media, types.MessageMediaContact):
         return types.InputMediaContact(
@@ -726,10 +742,12 @@ def _get_extension(file):
     """
     if isinstance(file, str):
         return os.path.splitext(file)[-1]
+    elif isinstance(file, pathlib.Path):
+        return file.suffix
     elif isinstance(file, bytes):
         kind = imghdr.what(io.BytesIO(file))
         return ('.' + kind) if kind else ''
-    elif isinstance(file, io.IOBase) and file.seekable():
+    elif isinstance(file, io.IOBase) and not isinstance(file, io.TextIOBase) and file.seekable():
         kind = imghdr.what(file)
         return ('.' + kind) if kind is not None else ''
     elif getattr(file, 'name', None):
@@ -854,11 +872,11 @@ def get_peer(peer):
             return types.PeerUser(peer.user_id)
 
         peer = get_input_peer(peer, allow_self=False, check_hash=False)
-        if isinstance(peer, types.InputPeerUser):
+        if isinstance(peer, (types.InputPeerUser, types.InputPeerUserFromMessage)):
             return types.PeerUser(peer.user_id)
         elif isinstance(peer, types.InputPeerChat):
             return types.PeerChat(peer.chat_id)
-        elif isinstance(peer, types.InputPeerChannel):
+        elif isinstance(peer, (types.InputPeerChannel, types.InputPeerChannelFromMessage)):
             return types.PeerChannel(peer.channel_id)
     except (AttributeError, TypeError):
         pass

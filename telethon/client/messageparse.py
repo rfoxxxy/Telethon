@@ -2,7 +2,7 @@ import itertools
 import re
 import typing
 
-from .. import utils
+from .. import helpers, utils
 from ..tl import types
 
 if typing.TYPE_CHECKING:
@@ -134,9 +134,14 @@ class MessageParseMethods:
                 id_to_message[update.message.id] = update.message
 
             elif (isinstance(update, types.UpdateEditMessage)
-                  and not isinstance(request.peer, types.InputPeerChannel)):
-                if request.id == update.message.id:
-                    update.message._finish_init(self, entities, input_chat)
+                  and helpers._entity_type(request.peer) != helpers._EntityType.CHANNEL):
+                update.message._finish_init(self, entities, input_chat)
+
+                # Live locations use `sendMedia` but Telegram responds with
+                # `updateEditMessage`, which means we won't have `id` field.
+                if hasattr(request, 'random_id'):
+                    id_to_message[update.message.id] = update.message
+                elif request.id == update.message.id:
                     return update.message
 
             elif (isinstance(update, types.UpdateEditChannelMessage)
@@ -149,6 +154,19 @@ class MessageParseMethods:
             elif isinstance(update, types.UpdateNewScheduledMessage):
                 update.message._finish_init(self, entities, input_chat)
                 sched_to_message[update.message.id] = update.message
+
+            elif isinstance(update, types.UpdateMessagePoll):
+                if request.media.poll.id == update.poll_id:
+                    m = types.Message(
+                        id=request.id,
+                        to_id=utils.get_peer(request.peer),
+                        media=types.MessageMediaPoll(
+                            poll=update.poll,
+                            results=update.results
+                        )
+                    )
+                    m._finish_init(self, entities, input_chat)
+                    return m
 
         if request is None:
             return id_to_message
