@@ -25,7 +25,7 @@ telethon_examples/
 ==================
 
 `telethon_examples <https://github.com/LonamiWebs/Telethon/tree/master/telethon_examples>`_ /
-`Lonami's site <https://lonami.dev>`_
+`LonamiWebs' site <https://lonamiwebs.github.io>`_
 
 This documentation is not the only place where you can find useful code
 snippets using the library. The main repository also has a folder with
@@ -96,11 +96,3 @@ a new ``Filter`` to define handlers more conveniently and utilities to
 run code on start and finish of the client. Be sure to check the project
 to learn about its latest features, since this description may be out of
 date.
-
-telethon-secret-chat
-====================
-
-`telethon-secret-chat <https://github.com/painor/telethon-secret-chat>`_ /
-`painor's GitHub <https://github.com/painor>`_
-
-This add-on can be used to work with secret chats in Telethon!

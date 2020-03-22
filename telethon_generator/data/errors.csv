@@ -68,7 +68,6 @@ CONNECTION_LAYER_INVALID,400,The very first request must always be InvokeWithLay
 CONNECTION_NOT_INITED,400,Connection not initialized
 CONNECTION_SYSTEM_EMPTY,400,Connection system empty
 CONTACT_ID_INVALID,400,The provided contact ID is invalid
-CONTACT_NAME_EMPTY,400,The provided contact name cannot be empty
 DATA_INVALID,400,Encrypted data invalid
 DATA_JSON_INVALID,400,The provided JSON data is invalid
 DATE_EMPTY,400,Date empty
@@ -115,7 +114,6 @@ GROUPED_MEDIA_INVALID,400,Invalid grouped media
 HASH_INVALID,400,The provided hash is invalid
 HISTORY_GET_FAILED,500,Fetching of history failed
 IMAGE_PROCESS_FAILED,400,Failure while processing image
-INLINE_BOT_REQUIRED,403,The action must be performed through an inline bot callback
 INLINE_RESULT_EXPIRED,400,The inline query expired
 INPUT_CONSTRUCTOR_INVALID,400,The provided constructor is invalid
 INPUT_FETCH_ERROR,,An error occurred while deserializing TL parameters
@@ -155,7 +153,6 @@ MESSAGE_ID_INVALID,400,"The specified message ID is invalid or you can't do that
 MESSAGE_NOT_MODIFIED,400,Content of the message was not modified
 MESSAGE_POLL_CLOSED,400,The poll was closed and can no longer be voted on
 MESSAGE_TOO_LONG,400,Message was too long. Current maximum length is 4096 UTF-8 characters
-MSGID_DECREASE_RETRY,500,The request should be retried with a lower message ID
 MSG_ID_INVALID,400,The message ID used in the peer was invalid
 MSG_WAIT_FAILED,400,A waiting call returned an error
 MT_SEND_QUEUE_TOO_LONG,500,
@@ -236,7 +233,6 @@ RPC_MCGET_FAIL,,"Telegram is having internal issues, please try again later."
 RSA_DECRYPT_FAILED,400,Internal RSA decryption failed
 SCHEDULE_BOT_NOT_ALLOWED,400,Bots are not allowed to schedule messages
 SCHEDULE_DATE_TOO_LATE,400,The date you tried to schedule is too far in the future (last known limit of 1 year and a few hours)
-SCHEDULE_STATUS_PRIVATE,400,You cannot schedule a message until the person comes online if their privacy does not show this information
 SCHEDULE_TOO_MUCH,400,You cannot schedule more messages in this chat (last known limit of 100 per chat)
 SEARCH_QUERY_EMPTY,400,The search query is empty
 SECONDS_INVALID,400,"Slow mode only supports certain values (e.g. 0, 10s, 30s, 1m, 5m, 15m and 1h)"
@@ -304,7 +300,6 @@ VIDEO_CONTENT_TYPE_INVALID,400,The video content type is not supported with the 
 WALLPAPER_FILE_INVALID,400,The given file cannot be used as a wallpaper
 WALLPAPER_INVALID,400,The input wallpaper was not valid
 WC_CONVERT_URL_INVALID,400,WC convert URL invalid
-WEBDOCUMENT_URL_INVALID,400,The given URL cannot be used
 WEBPAGE_CURL_FAILED,400,Failure while fetching the webpage with cURL
 WEBPAGE_MEDIA_EMPTY,400,Webpage media empty
 WORKER_BUSY_TOO_LONG_RETRY,500,Telegram workers are too busy to respond immediately

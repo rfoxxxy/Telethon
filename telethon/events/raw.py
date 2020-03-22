@@ -12,16 +12,6 @@ class Raw(EventBuilder):
         types (`list` | `tuple` | `type`, optional):
             The type or types that the :tl:`Update` instance must be.
             Equivalent to ``if not isinstance(update, types): return``.
-
-    Example
-        .. code-block:: python
-
-            from telethon import events
-
-            @client.on(events.Raw)
-            async def handler(update):
-                # Print all incoming updates
-                print(update.stringify())
     """
     def __init__(self, types=None, *, func=None):
         super().__init__(func=func)

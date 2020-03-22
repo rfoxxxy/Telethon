@@ -17,17 +17,6 @@ class ChatAction(EventBuilder):
 
     Note that "chat" refers to "small group, megagroup and broadcast
     channel", whereas "group" refers to "small group and megagroup" only.
-
-    Example
-        .. code-block:: python
-
-            from telethon import events
-
-            @client.on(events.ChatAction)
-            async def handler(event):
-                # Welcome every new user
-                if event.user_joined:
-                    await event.reply('Welcome to the group!')
     """
     @classmethod
     def build(cls, update, others=None, self_id=None):
@@ -316,7 +305,7 @@ class ChatAction(EventBuilder):
         @property
         def user(self):
             """
-            The first user that takes part in this action. For example, who joined.
+            The first user that takes part in this action (e.g. joined).
 
             Might be `None` if the information can't be retrieved or
             there is no user taking part.
@@ -357,7 +346,7 @@ class ChatAction(EventBuilder):
         @property
         def users(self):
             """
-            A list of users that take part in this action. For example, who joined.
+            A list of users that take part in this action (e.g. joined).
 
             Might be empty if the information can't be retrieved or there
             are no users taking part.
@@ -381,8 +370,7 @@ class ChatAction(EventBuilder):
             if not self._user_ids:
                 return []
 
-            # Note: we access the property first so that it fills if needed
-            if (self.users is None or len(self._users) != len(self._user_ids)) and self.action_message:
+            if self._users is None or len(self._users) != len(self._user_ids):
                 await self.action_message._reload_message()
                 self._users = [
                     u for u in self.action_message.action_entities
@@ -398,31 +386,19 @@ class ChatAction(EventBuilder):
             if self._input_users is None and self._user_ids:
                 self._input_users = []
                 for user_id in self._user_ids:
-                    # First try to get it from our entities
-                    try:
-                        self._input_users.append(utils.get_input_peer(self._entities[user_id]))
-                        continue
-                    except (KeyError, TypeError) as e:
-                        pass
-
-                    # If missing, try from the entity cache
                     try:
                         self._input_users.append(self._client._entity_cache[user_id])
-                        continue
                     except KeyError:
                         pass
-
             return self._input_users or []
 
         async def get_input_users(self):
             """
             Returns `input_users` but will make an API call if necessary.
             """
-            if not self._user_ids:
-                return []
-
-            # Note: we access the property first so that it fills if needed
-            if (self.input_users is None or len(self._input_users) != len(self._user_ids)) and self.action_message:
+            self._input_users = None
+            if self._input_users is None:
+                await self.action_message._reload_message()
                 self._input_users = [
                     utils.get_input_peer(u)
                     for u in self.action_message.action_entities
