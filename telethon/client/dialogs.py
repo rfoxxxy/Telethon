@@ -245,7 +245,7 @@ class DialogMethods:
 
                 # Getting only archived dialogs (both equivalent)
                 archived = await client.get_dialogs(folder=1)
-                non_archived = await client.get_dialogs(archived=True)
+                archived = await client.get_dialogs(archived=True)
         """
         return await self.iter_dialogs(*args, **kwargs).collect()
 
@@ -569,10 +569,10 @@ class DialogMethods:
                         # <you> Your name didn't have any letters! Try again
                         conv.send_message("Your name didn't have any letters! Try again")
 
-                        # <usr> Lonami
+                        # <usr> Human
                         name = conv.get_response().raw_text
 
-                    # <you> Thanks Lonami!
+                    # <you> Thanks Human!
                     conv.send_message('Thanks {}!'.format(name))
         """
         return custom.Conversation(
