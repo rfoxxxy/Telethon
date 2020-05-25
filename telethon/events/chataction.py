@@ -1,5 +1,5 @@
 from .common import EventBuilder, EventCommon, name_inner_event
-from .. import utils
+from .. import utils, helpers
 from ..tl import types, functions
 
 
@@ -36,6 +36,10 @@ class ChatAction(EventBuilder):
             # UpdateChannelPinnedMessage for new pins
             # but always for unpin, with update.id = 0
             return cls.Event(types.PeerChannel(update.channel_id),
+                             unpin=True)
+
+        elif isinstance(update, types.UpdateChatPinnedMessage) and update.id == 0:
+            return cls.Event(types.PeerChat(update.chat_id),
                              unpin=True)
 
         elif isinstance(update, types.UpdateChatParticipantAdd):
@@ -104,8 +108,9 @@ class ChatAction(EventBuilder):
                 return cls.Event(msg,
                                  users=msg.from_id,
                                  new_photo=True)
-            elif isinstance(action, types.MessageActionPinMessage):
-                # Telegram always sends this service message for new pins
+            elif isinstance(action, types.MessageActionPinMessage) and msg.reply_to_msg_id:
+                # Seems to not be reliable on unpins, but when pinning
+                # we prefer this because we know who caused it.
                 return cls.Event(msg,
                                  users=msg.from_id,
                                  new_pin=msg.reply_to_msg_id)
@@ -256,17 +261,8 @@ class ChatAction(EventBuilder):
 
             if isinstance(self._pinned_message, int)\
                     and await self.get_input_chat():
-                r = await self._client(functions.channels.GetMessagesRequest(
-                    self._input_chat, [self._pinned_message]
-                ))
-                try:
-                    self._pinned_message = next(
-                        x for x in r.messages
-                        if isinstance(x, types.Message)
-                        and x.id == self._pinned_message
-                    )
-                except StopIteration:
-                    pass
+                self._pinned_message = await self._client.get_messages(
+                    self._input_chat, ids=self._pinned_message)
 
             if isinstance(self._pinned_message, types.Message):
                 return self._pinned_message

@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import itertools
 import random
 import time
@@ -335,6 +336,9 @@ class UpdateMethods:
             except Exception:
                 continue  # Any disconnected exception should be ignored
 
+            # Check if we have any exported senders to clean-up periodically
+            await self._clean_exported_senders()
+
             # Don't bother sending pings until the low-level connection is
             # ready, otherwise a lot of pings will be batched to be sent upon
             # reconnect, when we really don't care about that.
@@ -421,7 +425,10 @@ class UpdateMethods:
             if not builder.resolved:
                 await builder.resolve(self)
 
-            if not builder.filter(event):
+            filter = builder.filter(event)
+            if inspect.isawaitable(filter):
+                filter = await filter
+            if not filter:
                 continue
 
             try:

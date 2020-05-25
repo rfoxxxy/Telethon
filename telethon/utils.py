@@ -51,6 +51,8 @@ mimetypes.add_type('audio/aac', '.aac')
 mimetypes.add_type('audio/ogg', '.ogg')
 mimetypes.add_type('audio/flac', '.flac')
 
+mimetypes.add_type('application/x-tgsticker', '.tgs')
+
 USERNAME_RE = re.compile(
     r'@|(?:https?://)?(?:www\.)?(?:telegram\.(?:me|dog)|t\.me)/(@|joinchat/)?'
 )
@@ -64,7 +66,7 @@ TG_JOIN_RE = re.compile(
 #
 # See https://telegram.org/blog/inline-bots#how-does-it-work
 VALID_USERNAME_RE = re.compile(
-    r'^([a-z]((?!__)[\w\d]){3,30}[a-z\d]'
+    r'^([a-z](?:(?!__)\w){3,30}[a-z\d]'
     r'|gif|vid|pic|bing|wiki|imdb|bold|vote|like|coub)$',
     re.IGNORECASE
 )
@@ -509,6 +511,9 @@ def get_input_media(
             venue_id=media.venue_id,
             venue_type=''
         )
+
+    if isinstance(media, types.MessageMediaDice):
+        return types.InputMediaDice(media.emoticon)
 
     if isinstance(media, (
             types.MessageMediaEmpty, types.MessageMediaUnsupported,

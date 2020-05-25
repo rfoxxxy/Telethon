@@ -78,6 +78,7 @@ EMAIL_HASH_EXPIRED,400,The email hash expired and cannot be used to verify it
 EMAIL_INVALID,400,The given email is invalid
 EMAIL_UNCONFIRMED_X,400,"Email unconfirmed, the length of the code must be {code_length}"
 EMOTICON_EMPTY,400,The emoticon field cannot be empty
+EMOTICON_INVALID,400,The specified emoticon cannot be used or was not a emoticon
 ENCRYPTED_MESSAGE_INVALID,400,Encrypted message invalid
 ENCRYPTION_ALREADY_ACCEPTED,400,Secret chat already accepted
 ENCRYPTION_ALREADY_DECLINED,400,The secret chat was already declined
@@ -101,6 +102,7 @@ FILE_PART_LENGTH_INVALID,400,The length of a file part is invalid
 FILE_PART_SIZE_CHANGED,400,The file part size (chunk size) cannot change during upload
 FILE_PART_SIZE_INVALID,400,The provided file part size is invalid
 FILE_PART_X_MISSING,400,Part {which} of the file is missing from storage
+FILE_REFERENCE_EMPTY,400,The file reference must exist to access the media and it cannot be empty
 FILEREF_UPGRADE_NEEDED,406,The file reference needs to be refreshed before being used again
 FIRSTNAME_INVALID,400,The first name is invalid
 FLOOD_TEST_PHONE_WAIT_X,420,A wait of {seconds} seconds is required in the test servers
@@ -108,6 +110,7 @@ FLOOD_WAIT_X,420,A wait of {seconds} seconds is required
 FOLDER_ID_EMPTY,400,The folder you tried to delete was already empty
 FOLDER_ID_INVALID,400,The folder you tried to use was not valid
 FRESH_CHANGE_ADMINS_FORBIDDEN,400,Recently logged-in users cannot add or change admins
+FRESH_CHANGE_PHONE_FORBIDDEN,406,Recently logged-in users cannot use this request
 FRESH_RESET_AUTHORISATION_FORBIDDEN,406,The current session is too new and cannot be used to reset other authorisations yet
 GAME_BOT_INVALID,400,You cannot send that game with the current bot
 GIF_ID_INVALID,400,The provided GIF ID is invalid
@@ -250,6 +253,7 @@ SHORTNAME_OCCUPY_FAILED,400,An error occurred when trying to register the short-
 SLOWMODE_WAIT_X,420,A wait of {seconds} seconds is required before sending another message in this chat
 START_PARAM_EMPTY,400,The start parameter is empty
 START_PARAM_INVALID,400,Start parameter invalid
+STATS_MIGRATE_X,303,The channel statistics must be fetched from DC {dc}
 STICKERSET_INVALID,400,The provided sticker set is invalid
 STICKERS_EMPTY,400,No sticker provided
 STICKER_EMOJI_INVALID,400,Sticker emoji invalid
