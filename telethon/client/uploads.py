@@ -766,8 +766,7 @@ class UploadMethods:
                 file=file_handle,
                 mime_type=mime_type,
                 attributes=attributes,
-                thumb=thumb,
-                force_file=force_document
+                thumb=thumb
             )
         return file_handle, media, as_image
 
