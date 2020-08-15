@@ -310,12 +310,19 @@ class DownloadMethods:
                 The parameter should be an integer index between ``0`` and
                 ``len(sizes)``. ``0`` will download the smallest thumbnail,
                 and ``len(sizes) - 1`` will download the largest thumbnail.
-                You can also use negative indices.
+                You can also use negative indices, which work the same as
+                they do in Python's `list`.
 
                 You can also pass the :tl:`PhotoSize` instance to use.
+                Alternatively, the thumb size type `str` may be used.
 
                 In short, use ``thumb=0`` if you want the smallest thumbnail
                 and ``thumb=-1`` if you want the largest thumbnail.
+
+                .. note::
+                    The largest thumbnail may be a video instead of a photo,
+                    as they are available since layer 116 and are bigger than
+                    any of the photos.
 
         Returns
             `None` if no media was provided, or if it was Empty. On success
@@ -562,7 +569,7 @@ class DownloadMethods:
                 # Streaming `media` to an output file
                 # After the iteration ends, the sender is cleaned up
                 with open('photo.jpg', 'wb') as fd:
-                    async for chunk client.iter_download(media):
+                    async for chunk in client.iter_download(media):
                         fd.write(chunk)
 
                 # Fetching only the header of a file (32 bytes)
@@ -630,12 +637,32 @@ class DownloadMethods:
 
     @staticmethod
     def _get_thumb(thumbs, thumb):
+        # Seems Telegram has changed the order and put `PhotoStrippedSize`
+        # last while this is the smallest (layer 116). Ensure we have the
+        # sizes sorted correctly with a custom function.
+        def sort_thumbs(thumb):
+            if isinstance(thumb, types.PhotoStrippedSize):
+                return 1, len(thumb.bytes)
+            if isinstance(thumb, types.PhotoCachedSize):
+                return 1, len(thumb.bytes)
+            if isinstance(thumb, types.PhotoSize):
+                return 1, thumb.size
+            if isinstance(thumb, types.VideoSize):
+                return 2, thumb.size
+
+            # Empty size or invalid should go last
+            return 0, 0
+
+        thumbs = list(sorted(thumbs, key=sort_thumbs))
+
         if thumb is None:
             return thumbs[-1]
         elif isinstance(thumb, int):
             return thumbs[thumb]
+        elif isinstance(thumb, str):
+            return next((t for t in thumbs if t.type == thumb), None)
         elif isinstance(thumb, (types.PhotoSize, types.PhotoCachedSize,
-                                types.PhotoStrippedSize)):
+                                types.PhotoStrippedSize, types.VideoSize)):
             return thumb
         else:
             return None
@@ -670,11 +697,16 @@ class DownloadMethods:
         if not isinstance(photo, types.Photo):
             return
 
-        size = self._get_thumb(photo.sizes, thumb)
+        # Include video sizes here (but they may be None so provide an empty list)
+        size = self._get_thumb(photo.sizes + (photo.video_sizes or []), thumb)
         if not size or isinstance(size, types.PhotoSizeEmpty):
             return
 
-        file = self._get_proper_filename(file, 'photo', '.jpg', date=date)
+        if isinstance(size, types.VideoSize):
+            file = self._get_proper_filename(file, 'video', '.mp4', date=date)
+        else:
+            file = self._get_proper_filename(file, 'photo', '.jpg', date=date)
+
         if isinstance(size, (types.PhotoCachedSize, types.PhotoStrippedSize)):
             return self._download_cached_photo_size(size, file)
 
