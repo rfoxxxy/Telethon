@@ -3,7 +3,7 @@ import asyncio
 import warnings
 
 from .. import utils
-from ..tl import TLObject, types
+from ..tl import TLObject, types  # pylint: disable=no-name-in-module
 from ..tl.custom.chatgetter import ChatGetter
 
 

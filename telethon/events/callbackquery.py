@@ -3,7 +3,7 @@ import struct
 
 from .common import EventBuilder, EventCommon, name_inner_event
 from .. import utils
-from ..tl import types, functions
+from ..tl import types, functions  # pylint: disable=no-name-in-module
 from ..tl.custom.sendergetter import SenderGetter
 
 

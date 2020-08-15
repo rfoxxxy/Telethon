@@ -21,7 +21,7 @@ from types import GeneratorType
 
 from .extensions import markdown, html
 from .helpers import add_surrogate, del_surrogate
-from .tl import types
+from .tl import types  # pylint: disable=no-name-in-module
 
 try:
     import hachoir
@@ -1114,7 +1114,7 @@ def resolve_bot_file_id(file_id):
     elif (version == 2 and len(data) == 44) or (version == 4 and len(data) == 49):
         if version == 2:
             (file_type, dc_id, media_id, access_hash,
-                volume_id, secret, local_id) = struct.unpack('<iiqqqqi', data)
+                volume_id, secret, local_id) = struct.unpack('<iiqqqqi', data)  # pylint: disable=unused-variable
         # elif version == 4:
         else:
             # TODO Figure out what the extra five bytes mean

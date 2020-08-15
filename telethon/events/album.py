@@ -4,7 +4,7 @@ import weakref
 
 from .common import EventBuilder, EventCommon, name_inner_event
 from .. import utils
-from ..tl import types
+from ..tl import types  # pylint: disable=no-name-in-module
 from ..tl.custom.sendergetter import SenderGetter
 
 _IGNORE_MAX_SIZE = 100  # len()
