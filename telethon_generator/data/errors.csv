@@ -30,6 +30,7 @@ BOT_MISSING,400,This method can only be run by a bot
 BOT_PAYMENTS_DISABLED,400,This method can only be run by a bot
 BOT_POLLS_DISABLED,400,You cannot create polls under a bot account
 BOT_RESPONSE_TIMEOUT,400,The bot did not answer to the callback query in time
+BROADCAST_FORBIDDEN,403,The request cannot be used in broadcast channels
 BROADCAST_ID_INVALID,400,The channel is invalid
 BROADCAST_PUBLIC_VOTERS_FORBIDDEN,400,You cannot broadcast polls where the voters are public
 BROADCAST_REQUIRED,400,The request can only be used with a broadcast channel
@@ -99,7 +100,7 @@ EXPORT_CARD_INVALID,400,Provided card is invalid
 EXTERNAL_URL_INVALID,400,External URL invalid
 FIELD_NAME_EMPTY,,The field with the name FIELD_NAME is missing
 FIELD_NAME_INVALID,,The field with the name FIELD_NAME is invalid
-FILE_ID_INVALID,400,The provided file id is invalid
+FILE_ID_INVALID,400,"The provided file id is invalid. Make sure all parameters are present, have the correct type and are not empty (ID, access hash, file reference, thumb size ...)"
 FILE_MIGRATE_X,303,The file to be accessed is currently stored in DC {new_dc}
 FILE_PARTS_INVALID,400,The number of file parts is invalid
 FILE_PART_0_MISSING,,File part 0 missing
@@ -193,7 +194,7 @@ PASSWORD_REQUIRED,400,The account must have 2-factor authentication enabled (a p
 PASSWORD_TOO_FRESH_X,400,The password was added too recently and {seconds} seconds must pass before using the method
 PAYMENT_PROVIDER_INVALID,400,The payment provider was not recognised or its token was invalid
 PEER_FLOOD,,Too many requests
-PEER_ID_INVALID,400,An invalid Peer was used. Make sure to pass the right peer type
+PEER_ID_INVALID,400,"An invalid Peer was used. Make sure to pass the right peer type and that the value is valid (for instance, bots cannot start conversations)"
 PEER_ID_NOT_SUPPORTED,400,The provided peer ID is not supported
 PERSISTENT_TIMESTAMP_EMPTY,400,Persistent timestamp empty
 PERSISTENT_TIMESTAMP_INVALID,400,Persistent timestamp invalid
@@ -270,6 +271,7 @@ START_PARAM_INVALID,400,Start parameter invalid
 STATS_MIGRATE_X,303,The channel statistics must be fetched from DC {dc}
 STICKERSET_INVALID,400,The provided sticker set is invalid
 STICKERS_EMPTY,400,No sticker provided
+STICKER_DOCUMENT_INVALID,400,"The sticker file was invalid (this file has failed Telegram internal checks, make sure to use the correct format and comply with https://core.telegram.org/animated_stickers)"
 STICKER_EMOJI_INVALID,400,Sticker emoji invalid
 STICKER_FILE_INVALID,400,Sticker file invalid
 STICKER_ID_INVALID,400,The provided sticker ID is invalid

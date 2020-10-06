@@ -467,6 +467,8 @@ class UpdateMethods:
         # the name of speed; we don't want to make it worse for all updates
         # just because albums may need it.
         for builder, callback in self._event_builders:
+            if isinstance(builder, events.Raw):
+                continue
             if not isinstance(event, builder.Event):
                 continue
 
@@ -511,8 +513,13 @@ class UpdateMethods:
         self._log[__name__].debug('Getting difference for entities '
                                   'for %r', update.__class__)
         if channel_id:
+            # There are reports where we somehow call get channel difference
+            # with `InputPeerEmpty`. Check our assumptions to better debug
+            # this when it happens.
+            assert isinstance(channel_id, int), 'channel_id was {}, not int in {}'.format(type(channel_id), update)
             try:
-                where = await self.get_input_entity(channel_id)
+                # Wrap the ID inside a peer to ensure we get a channel back.
+                where = await self.get_input_entity(types.PeerChannel(channel_id))
             except ValueError:
                 # There's a high chance that this fails, since
                 # we are getting the difference to fetch entities.
@@ -614,15 +621,8 @@ class EventBuilderDict:
         try:
             return self.__dict__[builder]
         except KeyError:
-            # Updates may arrive before login (like updateLoginToken) and we
-            # won't have our self ID yet (anyway only new messages need it).
-            self_id = (
-                self.client._self_input_peer.user_id
-                if self.client._self_input_peer
-                else None
-            )
             event = self.__dict__[builder] = builder.build(
-                self.update, self.others, self_id)
+                self.update, self.others, self.client._self_id)
 
             if isinstance(event, EventCommon):
                 event.original_update = self.update

@@ -217,6 +217,7 @@ class MTProtoSender:
         self._log.info('Connecting to %s...', self._connection)
 
         connected = False
+        
         for attempt in retry_range(self._retries):
             if not connected:
                 connected = await self._try_connect(attempt)
@@ -357,15 +358,27 @@ class MTProtoSender:
         self._state.reset()
 
         retries = self._retries if self._auto_reconnect else 0
-        for attempt in retry_range(retries):
+        
+        attempt = 0
+        # We're already "retrying" to connect, so we don't want to force retries
+        for attempt in retry_range(retries, force_retry=False):
             try:
                 await self._connect()
             except (IOError, asyncio.TimeoutError) as e:
                 last_error = e
                 self._log.info('Failed reconnection attempt %d with %s',
                                attempt, e.__class__.__name__)
-
                 await asyncio.sleep(self._delay)
+            except BufferError as e:
+                # TODO there should probably only be one place to except all these errors
+                if isinstance(e, InvalidBufferError) and e.code == 404:
+                    self._log.info('Broken authorization key; resetting')
+                    self.auth_key.key = None
+                    if self._auth_key_callback:
+                        self._auth_key_callback(None)
+                else:
+                    self._log.warning('Invalid buffer %s', e)
+
             except Exception as e:
                 last_error = e
                 self._log.exception('Unexpected exception reconnecting on '
@@ -428,13 +441,12 @@ class MTProtoSender:
                             len(batch), len(data))
 
             data = self._state.encrypt_message_data(data)
-            try:
-                await self._connection.send(data)
-            except IOError as e:
-                self._log.info('Connection closed while sending data')
-                self._start_reconnect(e)
-                return
 
+            # Whether sending succeeds or not, the popped requests are now
+            # pending because they're removed from the queue. If a reconnect
+            # occurs, they will be removed from pending state and re-enqueued
+            # so even if the network fails they won't be lost. If they were
+            # never re-enqueued, the future waiting for a response "locks".
             for state in batch:
                 if not isinstance(state, list):
                     if isinstance(state.request, TLRequest):
@@ -443,6 +455,13 @@ class MTProtoSender:
                     for s in state:
                         if isinstance(s.request, TLRequest):
                             self._pending_state[s.msg_id] = s
+
+            try:
+                await self._connection.send(data)
+            except IOError as e:
+                self._log.info('Connection closed while sending data')
+                self._start_reconnect(e)
+                return
 
             self._log.debug('Encrypted messages put in a queue to be sent')
 
@@ -478,12 +497,11 @@ class MTProtoSender:
             except BufferError as e:
                 if isinstance(e, InvalidBufferError) and e.code == 404:
                     self._log.info('Broken authorization key; resetting')
+                    self.auth_key.key = None
+                    if self._auth_key_callback:
+                        self._auth_key_callback(None)
                 else:
                     self._log.warning('Invalid buffer %s', e)
-
-                self.auth_key.key = None
-                if self._auth_key_callback:
-                    self._auth_key_callback(None)
 
                 self._start_reconnect(e)
                 return

@@ -62,7 +62,7 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
         legacy (`bool`):
             Whether this is a legacy message or not.
 
-        to_id (:tl:`Peer`):
+        peer_id (:tl:`Peer`):
             The peer to which this message was sent, which is either
             :tl:`PeerUser`, :tl:`PeerChat` or :tl:`PeerChannel`. This
             will always be present except for empty messages.
@@ -81,12 +81,13 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
             The message action object of the message for :tl:`MessageService`
             instances, which will be `None` for other types of messages.
 
-        from_id (`int`):
-            The ID of the user who sent this message. This will be
-            `None` if the message was sent in a broadcast channel.
+        from_id (:tl:`Peer`):
+            The peer who sent this message, which is either
+            :tl:`PeerUser`, :tl:`PeerChat` or :tl:`PeerChannel`.
+            This value will be `None` for anonymous messages.
 
-        reply_to_msg_id (`int`):
-            The ID to which this message is replying to, if any.
+        reply_to (:tl:`MessageReplyHeader`):
+            The original reply header if this message is replying to another.
 
         fwd_from (:tl:`MessageFwdHeader`):
             The original forward header if this message is a forward.
@@ -147,11 +148,11 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
             self, id,
 
             # Common to Message and MessageService (mandatory)
-            to_id=None, date=None,
+            peer_id=None, date=None,
 
             # Common to Message and MessageService (flags)
             out=None, mentioned=None, media_unread=None, silent=None,
-            post=None, from_id=None, reply_to_msg_id=None,
+            post=None, from_id=None, reply_to=None,
 
             # For Message (mandatory)
             message=None,
@@ -160,13 +161,14 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
             fwd_from=None, via_bot_id=None, media=None, reply_markup=None,
             entities=None, views=None, edit_date=None, post_author=None,
             grouped_id=None, from_scheduled=None, legacy=None,
-            edit_hide=None, restriction_reason=None,
+            edit_hide=None, restriction_reason=None, forwards=None,
+            replies=None,
 
             # For MessageAction (mandatory)
             action=None):
         # Common properties to all messages
         self.id = id
-        self.to_id = to_id
+        self.peer_id = peer_id
         self.date = date
         self.out = out
         self.mentioned = mentioned
@@ -174,7 +176,7 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
         self.silent = silent
         self.post = post
         self.from_id = from_id
-        self.reply_to_msg_id = reply_to_msg_id
+        self.reply_to = reply_to
         self.message = message
         self.fwd_from = fwd_from
         self.via_bot_id = via_bot_id
@@ -191,6 +193,8 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
         self.legacy = legacy
         self.edit_hide = edit_hide
         self.restriction_reason = restriction_reason
+        self.forwards = forwards
+        self.replies = replies
         self.action = action
 
         # Convenient storage for custom functions
@@ -206,20 +210,20 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
         self._via_input_bot = None
         self._action_entities = None
 
-        if not out and isinstance(to_id, types.PeerUser):
-            chat_peer = types.PeerUser(from_id)
-            if from_id == to_id.user_id:
-                self.out = not self.fwd_from  # Patch out in our chat
-        else:
-            chat_peer = to_id
+        sender_id = None
+        if from_id is not None:
+            sender_id = utils.get_peer_id(from_id)
+        elif peer_id:
+            # If the message comes from a Channel, let the sender be it
+            # ...or...
+            # incoming messages in private conversations no longer have from_id
+            # (layer 119+), but the sender can only be the chat we're in.
+            if post or (not out and isinstance(peer_id, types.PeerUser)):
+                sender_id = utils.get_peer_id(peer_id)
 
         # Note that these calls would reset the client
-        ChatGetter.__init__(self, chat_peer, broadcast=post)
-        SenderGetter.__init__(self, from_id)
-
-        if post and not from_id and chat_peer:
-            # If the message comes from a Channel, let the sender be it
-            self._sender_id = utils.get_peer_id(chat_peer)
+        ChatGetter.__init__(self, peer_id, broadcast=post)
+        SenderGetter.__init__(self, sender_id)
 
         self._forward = None
 
@@ -326,10 +330,10 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
         `True` if the message is a reply to some other message.
 
         Remember that you can access the ID of the message
-        this one is replying to through `reply_to_msg_id`,
+        this one is replying to through `reply_to.reply_to_msg_id`,
         and the `Message` object with `get_reply_message()`.
         """
-        return bool(self.reply_to_msg_id)
+        return self.reply_to is not None
 
     @property
     def forward(self):
@@ -593,6 +597,27 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
         """
         return self._via_input_bot
 
+    @property
+    def reply_to_msg_id(self):
+        """
+        Returns the message ID this message is replying to, if any.
+        This is equivalent to accessing ``.reply_to.reply_to_msg_id``.
+        """
+        return self.reply_to.reply_to_msg_id if self.reply_to else None
+
+    @property
+    def to_id(self):
+        """
+        Returns the peer to which this message was sent to. This used to exist
+        to infer the ``.peer_id``.
+        """
+        # If the client wasn't set we can't emulate the behaviour correctly,
+        # so as a best-effort simply return the chat peer.
+        if self._client and not self.out and self.is_private:
+            return types.PeerUser(self._client._self_id)
+
+        return self.peer_id
+
     # endregion Public Properties
 
     # region Public Methods
@@ -644,7 +669,7 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
         The result will be cached after its first use.
         """
         if self._reply_message is None and self._client:
-            if not self.reply_to_msg_id:
+            if not self.reply_to:
                 return None
 
             # Bots cannot access other bots' messages by their ID.
@@ -660,7 +685,7 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
                 # directly by its ID.
                 self._reply_message = await self._client.get_messages(
                     self._input_chat if self.is_channel else None,
-                    ids=self.reply_to_msg_id
+                    ids=self.reply_to.reply_to_msg_id
                 )
 
         return self._reply_message
@@ -761,6 +786,8 @@ class Message(ChatGetter, SenderGetter, TLObject, abc.ABC):
         with the ``message`` already set.
         """
         if self._client:
+            # Passing the entire message is important, in case it has to be
+            # refetched for a fresh file reference.
             return await self._client.download_media(self, *args, **kwargs)
 
     async def click(self, i=None, j=None,

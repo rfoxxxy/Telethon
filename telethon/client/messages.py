@@ -1,6 +1,7 @@
 import inspect
 import itertools
 import typing
+import warnings
 
 from .. import helpers, utils, errors, hints
 from ..requestiter import RequestIter
@@ -62,29 +63,31 @@ class _MessagesIter(RequestIter):
                 from_user = None  # Ignore from_user unless it's a user
 
         if from_user:
-            self.from_id = await self.client.get_peer_id(from_user)
+            self.from_id = utils.get_peer(from_user)
         else:
             self.from_id = None
 
-        # `messages.searchGlobal` only works with text `search` queries.
-        # If we want to perform global a search with `from_user` or `filter`,
-        # we have to perform a normal `messages.search`, *but* we can make the
-        # entity be `inputPeerEmpty`.
-        if not self.entity and (filter or from_user):
+        # `messages.searchGlobal` only works with text `search` or `filter` queries.
+        # If we want to perform global a search with `from_user` we have to perform
+        # a normal `messages.search`, *but* we can make the entity be `inputPeerEmpty`.
+        if not self.entity and from_user:
             self.entity = types.InputPeerEmpty()
+
+        if filter is None:
+            filter = types.InputMessagesFilterEmpty()
 
         if not self.entity:
             self.request = functions.messages.SearchGlobalRequest(
                 q=search or '',
-                offset_rate=offset_date,
+                filter=filter,
+                min_date=None,
+                max_date=offset_date,
+                offset_rate=None,
                 offset_peer=types.InputPeerEmpty(),
                 offset_id=offset_id,
                 limit=1
             )
         elif search is not None or filter or from_user:
-            if filter is None:
-                filter = types.InputMessagesFilterEmpty()
-
             # Telegram completely ignores `from_id` in private chats
             ty = helpers._entity_type(self.entity)
             if ty == helpers._EntityType.USER:
@@ -191,7 +194,7 @@ class _MessagesIter(RequestIter):
         # Get the last message that's not empty (in some rare cases
         # it can happen that the last message is :tl:`MessageEmpty`)
         if self.buffer:
-            self._update_offset(self.buffer[-1])
+            self._update_offset(self.buffer[-1], r)
         else:
             # There are some cases where all the messages we get start
             # being empty. This can happen on migrated mega-groups if
@@ -217,7 +220,7 @@ class _MessagesIter(RequestIter):
 
         return True
 
-    def _update_offset(self, last_message):
+    def _update_offset(self, last_message, response):
         """
         After making the request, update its offset with the last message.
         """
@@ -237,7 +240,12 @@ class _MessagesIter(RequestIter):
             self.request.offset_date = last_message.date
 
         if isinstance(self.request, functions.messages.SearchGlobalRequest):
-            self.request.offset_peer = last_message.input_chat
+            if last_message.input_chat:
+                self.request.offset_peer = last_message.input_chat
+            else:
+                self.request.offset_peer = types.InputPeerEmpty()
+
+            self.request.offset_rate = getattr(response, 'next_rate', None)
 
 
 class _IDsIter(RequestIter):
@@ -270,7 +278,7 @@ class _IDsIter(RequestIter):
         else:
             r = await self.client(functions.messages.GetMessagesRequest(ids))
             if self._entity:
-                from_id = await self.client.get_peer_id(self._entity)
+                from_id = utils.get_peer(self._entity)
 
         if isinstance(r, types.messages.MessagesNotModified):
             self.buffer.extend(None for _ in ids)
@@ -289,7 +297,7 @@ class _IDsIter(RequestIter):
         # arbitrary chats. Validate these unless ``from_id is None``.
         for message in r.messages:
             if isinstance(message, types.MessageEmpty) or (
-                    from_id and message.chat_id != from_id):
+                    from_id and message.peer_id != from_id):
                 self.buffer.append(None)
             else:
                 message._finish_init(self.client, entities, self._entity)
@@ -543,6 +551,7 @@ class MessageMethods:
             *,
             reply_to: 'typing.Union[int, types.Message]' = None,
             parse_mode: typing.Optional[str] = (),
+            formatting_entities: typing.Optional[typing.List[types.TypeMessageEntity]] = None,
             link_preview: bool = True,
             file: 'typing.Union[hints.FileLike, typing.Sequence[hints.FileLike]]' = None,
             force_document: bool = False,
@@ -589,6 +598,9 @@ class MessageMethods:
                 <telethon.client.messageparse.MessageParseMethods.parse_mode>`
                 property for allowed values. Markdown parsing will be used by
                 default.
+
+            formatting_entities (`list`, optional):
+                A list of message formatting entities. When provided, the ``parse_mode`` is ignored.
 
             link_preview (`bool`, optional):
                 Should the link preview be shown?
@@ -691,7 +703,7 @@ class MessageMethods:
                 entity, file, caption=message, reply_to=reply_to,
                 parse_mode=parse_mode, force_document=force_document,
                 buttons=buttons, clear_draft=clear_draft, silent=silent,
-                schedule=schedule
+                schedule=schedule, formatting_entities=formatting_entities
             )
 
         entity = await self.get_input_entity(entity)
@@ -713,7 +725,7 @@ class MessageMethods:
                     silent=silent,
                     reply_to=reply_to,
                     buttons=markup,
-                    entities=message.entities,
+                    formatting_entities=message.entities,
                     schedule=schedule
                 )
 
@@ -731,7 +743,8 @@ class MessageMethods:
             )
             message = message.message
         else:
-            message, msg_ent = await self._parse_message_text(message, parse_mode)
+            if formatting_entities is None:
+                message, formatting_entities = await self._parse_message_text(message, parse_mode)
             if not message:
                 raise ValueError(
                     'The message cannot be empty unless a file is provided'
@@ -740,7 +753,7 @@ class MessageMethods:
             request = functions.messages.SendMessageRequest(
                 peer=entity,
                 message=message,
-                entities=msg_ent,
+                entities=formatting_entities,
                 no_webpage=not link_preview,
                 reply_to_msg_id=utils.get_message_id(reply_to),
                 clear_draft=clear_draft,
@@ -753,7 +766,7 @@ class MessageMethods:
         if isinstance(result, types.UpdateShortSentMessage):
             message = types.Message(
                 id=result.id,
-                to_id=utils.get_peer(entity),
+                peer_id=utils.get_peer(entity),
                 message=message,
                 date=result.date,
                 out=result.out,
@@ -805,15 +818,7 @@ class MessageMethods:
                 this behaviour.
 
             as_album (`bool`, optional):
-                Whether several image messages should be forwarded as an
-                album (grouped) or not. The default behaviour is to treat
-                albums specially and send outgoing requests with
-                ``as_album=True`` only for the albums if message objects
-                are used. If IDs are used it will group by default.
-
-                In short, the default should do what you expect,
-                `True` will group always (even converting separate
-                images into albums), and `False` will never group.
+                This flag no longer has any effect.
 
             schedule (`hints.DateLike`, optional):
                 If set, the message(s) won't forward immediately, and
@@ -846,6 +851,9 @@ class MessageMethods:
                 # Forwarding as a copy
                 await client.send_message(chat, message)
         """
+        if as_album is not None:
+            warnings.warn('the as_album argument is deprecated and no longer has any effect')
+
         single = not utils.is_list_like(messages)
         if single:
             messages = (messages,)
@@ -858,44 +866,24 @@ class MessageMethods:
         else:
             from_peer_id = None
 
-        def _get_key(m):
+        def get_key(m):
             if isinstance(m, int):
                 if from_peer_id is not None:
-                    return from_peer_id, None
+                    return from_peer_id
 
                 raise ValueError('from_peer must be given if integer IDs are used')
             elif isinstance(m, types.Message):
-                return m.chat_id, m.grouped_id
+                return m.chat_id
             else:
                 raise TypeError('Cannot forward messages of type {}'.format(type(m)))
 
-        # We want to group outgoing chunks differently if we are "smart"
-        # about sending as album.
-        #
-        # Why? We need separate requests for ``as_album=True/False``, so
-        # if we want that behaviour, when we group messages to create the
-        # chunks, we need to consider the grouped ID too. But if we don't
-        # care about that, we don't need to consider it for creating the
-        # chunks, so we can make less requests.
-        if as_album is None:
-            get_key = _get_key
-        else:
-            def get_key(m):
-                return _get_key(m)[0]  # Ignore grouped_id
-
         sent = []
-        for chat_id, chunk in itertools.groupby(messages, key=get_key):
+        for _chat_id, chunk in itertools.groupby(messages, key=get_key):
             chunk = list(chunk)
             if isinstance(chunk[0], int):
                 chat = from_peer
-                grouped = True if as_album is None else as_album
             else:
                 chat = await chunk[0].get_input_chat()
-                if as_album is None:
-                    grouped = any(m.grouped_id is not None for m in chunk)
-                else:
-                    grouped = as_album
-
                 chunk = [m.id for m in chunk]
 
             req = functions.messages.ForwardMessagesRequest(
@@ -903,10 +891,6 @@ class MessageMethods:
                 id=chunk,
                 to_peer=entity,
                 silent=silent,
-                # Trying to send a single message as grouped will cause
-                # GROUPED_MEDIA_INVALID. If more than one message is forwarded
-                # (even without media...), this error goes away.
-                grouped=len(chunk) > 1 and grouped,
                 schedule_date=schedule
             )
             result = await self(req)
@@ -921,6 +905,7 @@ class MessageMethods:
             text: str = None,
             *,
             parse_mode: str = (),
+            formatting_entities: typing.Optional[typing.List[types.TypeMessageEntity]] = None,
             link_preview: bool = True,
             file: 'hints.FileLike' = None,
             force_document: bool = False,
@@ -959,6 +944,9 @@ class MessageMethods:
                 <telethon.client.messageparse.MessageParseMethods.parse_mode>`
                 property for allowed values. Markdown parsing will be used by
                 default.
+
+            formatting_entities (`list`, optional):
+                A list of message formatting entities. When provided, the ``parse_mode`` is ignored.
 
             link_preview (`bool`, optional):
                 Should the link preview be shown?
@@ -1018,9 +1006,10 @@ class MessageMethods:
         elif isinstance(entity, types.Message):
             text = message  # Shift the parameters to the right
             message = entity
-            entity = entity.to_id
+            entity = entity.peer_id
 
-        text, msg_entities = await self._parse_message_text(text, parse_mode)
+        if formatting_entities is None:
+            text, formatting_entities = await self._parse_message_text(text, parse_mode)
         file_handle, media, image = await self._file_to_media(file,
                 force_document=force_document)
 
@@ -1029,7 +1018,7 @@ class MessageMethods:
                 id=entity,
                 message=text,
                 no_webpage=not link_preview,
-                entities=msg_entities,
+                entities=formatting_entities,
                 media=media,
                 reply_markup=self.build_reply_markup(buttons)
             )
@@ -1051,7 +1040,7 @@ class MessageMethods:
             id=utils.get_message_id(message),
             message=text,
             no_webpage=not link_preview,
-            entities=msg_entities,
+            entities=formatting_entities,
             media=media,
             reply_markup=self.build_reply_markup(buttons),
             schedule_date=schedule

@@ -102,6 +102,7 @@ class UploadMethods:
             thumb: 'hints.FileLike' = None,
             allow_cache: bool = True,
             parse_mode: str = (),
+            formatting_entities: typing.Optional[typing.List[types.TypeMessageEntity]] = None,
             voice_note: bool = False,
             video_note: bool = False,
             buttons: 'hints.MarkupLike' = None,
@@ -214,6 +215,9 @@ class UploadMethods:
                 <telethon.client.messageparse.MessageParseMethods.parse_mode>`
                 property for allowed values. Markdown parsing will be used by
                 default.
+
+            formatting_entities (`list`, optional):
+                A list of message formatting entities. When provided, the ``parse_mode`` is ignored.
 
             voice_note (`bool`, optional):
                 If `True` the audio will be sent as a voice note.
@@ -355,10 +359,8 @@ class UploadMethods:
         entity = await self.get_input_entity(entity)
         reply_to = utils.get_message_id(reply_to)
 
-        # Not document since it's subject to change.
-        # Needed when a Message is passed to send_message and it has media.
-        if 'entities' in kwargs:
-            msg_entities = kwargs['entities']
+        if formatting_entities is not None:
+            msg_entities = formatting_entities
         else:
             caption, msg_entities =\
                 await self._parse_message_text(caption, parse_mode)
@@ -540,83 +542,43 @@ class UploadMethods:
         if isinstance(file, (types.InputFile, types.InputFileBig)):
             return file  # Already uploaded
 
-        if not file_name and getattr(file, 'name', None):
-            file_name = file.name
-
-        if file_size is not None:
-            pass  # do nothing as it's already kwown
-        elif isinstance(file, str):
-            file_size = os.path.getsize(file)
-            stream = open(file, 'rb')
-            close_stream = True
-        elif isinstance(file, bytes):
-            file_size = len(file)
-            stream = io.BytesIO(file)
-            close_stream = True
-        else:
-            if not callable(getattr(file, 'read', None)):
-                raise TypeError('file description should have a `read` method')
-
-            if callable(getattr(file, 'seekable', None)):
-                seekable = await helpers._maybe_await(file.seekable())
-            else:
-                seekable = False
-
-            if seekable:
-                pos = await helpers._maybe_await(file.tell())
-                await helpers._maybe_await(file.seek(0, os.SEEK_END))
-                file_size = await helpers._maybe_await(file.tell())
-                await helpers._maybe_await(file.seek(pos, os.SEEK_SET))
-
-                stream = file
-                close_stream = False
-            else:
-                self._log[__name__].warning(
-                    'Could not determine file size beforehand so the entire '
-                    'file will be read in-memory')
-
-                data = await helpers._maybe_await(file.read())
-                stream = io.BytesIO(data)
-                close_stream = True
-                file_size = len(data)
-
-        # File will now either be a string or bytes
-        if not part_size_kb:
-            part_size_kb = utils.get_appropriated_part_size(file_size)
-
-        if part_size_kb > 512:
-            raise ValueError('The part size must be less or equal to 512KB')
-
-        part_size = int(part_size_kb * 1024)
-        if part_size % 1024 != 0:
-            raise ValueError(
-                'The part size must be evenly divisible by 1024')
-
-        # Set a default file name if None was specified
-        file_id = helpers.generate_random_long()
-        if not file_name:
-            if isinstance(file, str):
-                file_name = os.path.basename(file)
-            else:
-                file_name = str(file_id)
-
-        # If the file name lacks extension, add it if possible.
-        # Else Telegram complains with `PHOTO_EXT_INVALID_ERROR`
-        # even if the uploaded image is indeed a photo.
-        if not os.path.splitext(file_name)[-1]:
-            file_name += utils._get_extension(file)
-
-        # Determine whether the file is too big (over 10MB) or not
-        # Telegram does make a distinction between smaller or larger files
-        is_big = file_size > 10 * 1024 * 1024
-        hash_md5 = hashlib.md5()
-
-        part_count = (file_size + part_size - 1) // part_size
-        self._log[__name__].info('Uploading file of %d bytes in %d chunks of %d',
-                                 file_size, part_count, part_size)
-
         pos = 0
-        try:
+        async with helpers._FileStream(file, file_size=file_size) as stream:
+            # Opening the stream will determine the correct file size
+            file_size = stream.file_size
+
+            if not part_size_kb:
+                part_size_kb = utils.get_appropriated_part_size(file_size)
+
+            if part_size_kb > 512:
+                raise ValueError('The part size must be less or equal to 512KB')
+
+            part_size = int(part_size_kb * 1024)
+            if part_size % 1024 != 0:
+                raise ValueError(
+                    'The part size must be evenly divisible by 1024')
+
+            # Set a default file name if None was specified
+            file_id = helpers.generate_random_long()
+            if not file_name:
+                file_name = stream.name or str(file_id)
+
+            # If the file name lacks extension, add it if possible.
+            # Else Telegram complains with `PHOTO_EXT_INVALID_ERROR`
+            # even if the uploaded image is indeed a photo.
+            if not os.path.splitext(file_name)[-1]:
+                file_name += utils._get_extension(stream)
+
+            # Determine whether the file is too big (over 10MB) or not
+            # Telegram does make a distinction between smaller or larger files
+            is_big = file_size > 10 * 1024 * 1024
+            hash_md5 = hashlib.md5()
+
+            part_count = (file_size + part_size - 1) // part_size
+            self._log[__name__].info('Uploading file of %d bytes in %d chunks of %d',
+                                    file_size, part_count, part_size)
+
+            pos = 0
             for part_index in range(part_count):
                 # Read the file by in chunks of size part_size
                 part = await helpers._maybe_await(stream.read(part_size))
@@ -663,9 +625,6 @@ class UploadMethods:
                 else:
                     raise RuntimeError(
                         'Failed to upload file part {}.'.format(part_index))
-        finally:
-            if close_stream:
-                await helpers._maybe_await(stream.close())
 
         if is_big:
             return types.InputFileBig(file_id, part_count, file_name)
