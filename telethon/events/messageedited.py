@@ -1,6 +1,6 @@
 from .common import name_inner_event
 from .newmessage import NewMessage
-from ..tl import types  # pylint: disable=no-name-in-module
+from ..tl import types
 
 
 @name_inner_event

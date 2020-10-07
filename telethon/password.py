@@ -2,7 +2,7 @@ import hashlib
 import os
 
 from .crypto import factorization
-from .tl import types  # pylint: disable=no-name-in-module
+from .tl import types
 
 
 def check_prime_and_good_check(prime: int, g: int):

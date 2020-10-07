@@ -3,7 +3,7 @@ import struct
 
 from .common import EventBuilder, EventCommon, name_inner_event
 from .. import utils
-from ..tl import types, functions  # pylint: disable=no-name-in-module
+from ..tl import types, functions
 from ..tl.custom.sendergetter import SenderGetter
 
 
@@ -153,14 +153,6 @@ class CallbackQuery(EventBuilder):
             self._sender, self._input_sender = utils._get_entity_pair(
                 self.sender_id, self._entities, client._entity_cache)
 
-        @property
-        def from_user(self):
-            """
-            Returns the user ID who click the inline
-            button.
-            """
-            return self.query.user_id
-        
         @property
         def id(self):
             """

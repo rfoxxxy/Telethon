@@ -21,7 +21,7 @@ from types import GeneratorType
 
 from .extensions import markdown, html
 from .helpers import add_surrogate, del_surrogate
-from .tl import types  # pylint: disable=no-name-in-module
+from .tl import types
 
 try:
     import hachoir
@@ -483,7 +483,7 @@ def get_input_media(
                 supports_streaming=supports_streaming
             )
             return types.InputMediaUploadedDocument(
-                file=media, mime_type=mime, attributes=attrs)
+                file=media, mime_type=mime, attributes=attrs, force_file=force_document)
 
     if isinstance(media, types.MessageMediaGame):
         return types.InputMediaGame(id=types.InputGameID(
@@ -1170,7 +1170,7 @@ def resolve_bot_file_id(file_id):
     elif (version == 2 and len(data) == 44) or (version == 4 and len(data) == 49):
         if version == 2:
             (file_type, dc_id, media_id, access_hash,
-                volume_id, secret, local_id) = struct.unpack('<iiqqqqi', data)  # pylint: disable=unused-variable
+                volume_id, secret, local_id) = struct.unpack('<iiqqqqi', data)
         # elif version == 4:
         else:
             # TODO Figure out what the extra five bytes mean

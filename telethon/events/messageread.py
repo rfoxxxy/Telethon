@@ -1,6 +1,6 @@
 from .common import EventBuilder, EventCommon, name_inner_event
 from .. import utils
-from ..tl import types  # pylint: disable=no-name-in-module
+from ..tl import types
 
 
 @name_inner_event

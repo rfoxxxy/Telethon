@@ -5,7 +5,7 @@ import asyncio
 
 from .common import EventBuilder, EventCommon, name_inner_event
 from .. import utils
-from ..tl import types, functions, custom  # pylint: disable=no-name-in-module
+from ..tl import types, functions, custom
 from ..tl.custom.sendergetter import SenderGetter
 
 
@@ -107,13 +107,6 @@ class InlineQuery(EventBuilder):
             Returns the unique identifier for the query ID.
             """
             return self.query.query_id
-        
-        @property
-        def from_user(self):
-            """
-            Returns the user ID who click send the query
-            """
-            return self.query.user_id
 
         @property
         def text(self):

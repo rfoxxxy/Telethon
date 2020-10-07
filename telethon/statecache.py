@@ -1,6 +1,6 @@
 import inspect
 
-from .tl import types  # pylint: disable=no-name-in-module
+from .tl import types
 
 
 # Which updates have the following fields?
